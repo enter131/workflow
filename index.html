@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>日程管理小秘书</title>
+  <style>
+    .developer-info {
+      position: fixed;
+      bottom: 10px;
+      right: 10px;
+      font-size: 12px;
+      color: #666;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    }
+    .decorative-image {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      width: 120px;
+      height: 60px;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .decorative-image img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      margin: 20px;
+      background-color: #f5f5f5;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background-color: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #333;
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    .add-form {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      justify-content: center;
+    }
+    input {
+      width: 300px;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    button {
+      padding: 8px 16px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #45a049;
+    }
+    .workflow-list {
+      list-style: none;
+      padding: 0;
+    }
+    .workflow-item {
+      display: flex;
+      align-items: center;
+      padding: 12px 15px;
+      background-color: #ffffff;
+      margin-bottom: 10px;
+      border-radius: 6px;
+      cursor: move;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    .workflow-item:hover {
+      background-color: #f0f0f0;
+    }
+    .item-name {
+      flex: 1;
+    }
+    .delete-btn {
+      background-color: #f44336;
+      margin-left: 10px;
+    }
+    .delete-btn:hover {
+      background-color: #da190b;
+    }
+    .quadrant-container {
+      display: flex;
+      flex-wrap: wrap;
+      margin-top: 30px;
+      min-height: 600px;
+      position: relative;
+    }
+    .quadrant-row {
+      display: flex;
+      width: 100%;
+      height: 50%;
+    }
+    .quadrant {
+      flex: 1;
+      position: relative;
+    }
+    .resizer-h {
+      width: 10px;
+      height: 100%;
+      background-color: #ddd;
+      cursor: col-resize;
+      position: absolute;
+      right: -5px;
+      top: 0;
+    }
+    .resizer-v {
+      width: 100%;
+      height: 10px;
+      background-color: #ddd;
+      cursor: row-resize;
+      position: absolute;
+      bottom: -5px;
+      left: 0;
+    }
+    .resizer-h:hover,
+    .resizer-v:hover {
+      background-color: #bbb;
+    }
+    .quadrant {
+      border: 2px solid rgba(0, 0, 0, 0.1);
+      padding: 15px;
+      border-radius: 8px;
+      transition: all 0.3s ease;
+    }
+    #q1 { background-color: rgba(255, 99, 71, 0.4); }
+    #q2 { background-color: rgba(255, 165, 0, 0.4); }
+    #q3 { background-color: rgba(255, 215, 0, 0.4); }
+    #q4 { background-color: rgba(144, 238, 144, 0.4); }
+    .quadrant:hover {
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .quadrant-title {
+      text-align: center;
+      margin-bottom: 20px;
+      color: #333;
+      font-weight: bold;
+      font-size: 1.2em;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .quadrant .workflow-list {
+      min-height: 200px;
+    }
+    .workflow-item {
+      display: flex;
+      align-items: center;
+      padding: 12px;
+      background-color: white;
+      margin-bottom: 10px;
+      border-radius: 6px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .workflow-item:hover {
+      background-color: #f8f8f8;
+    }
+    .item-link {
+      margin-left: 12px;
+      color: #2196F3;
+      cursor: pointer;
+      font-size: 1.2em;
+      padding: 6px;
+      background-color: transparent;
+      border-radius: 4px;
+      transition: background-color 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      text-decoration: none;
+    }
+    .item-link:hover {
+      background-color: rgba(33, 150, 243, 0.1);
+    }
+    .item-link span {
+      font-size: 0.9em;
+      margin-left: 4px;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+    .item-link:hover span {
+      opacity: 1;
+    }
+    .item-link i {
+      margin-right: 0;
+    }
+    .item-link span {
+      display: none;
+      font-size: 0.9em;
+      margin-left: 4px;
+    }
+    .item-link:hover span {
+      display: inline;
+    }
+      font-size: 0.9em;
+      padding: 6px 10px;
+      background-color: rgba(33, 150, 243, 0.1);
+      border-radius: 4px;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .link-input {
+      width: 200px;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      margin-right: 10px;
+    }
+    .attach-btn {
+      background-color: #2196F3;
+    }
+    .attach-btn:hover {
+      background-color: #1976D2;
+    }
+    .item-link:hover {
+      text-decoration: none;
+      background-color: rgba(33, 150, 243, 0.2);
+    }
+    .priority-indicator {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      margin-right: 8px;
+    }
+    .priority-1 { background-color: #ff4444; }
+    .priority-2 { background-color: #ffbb33; }
+    .priority-3 { background-color: #00C851; }
+    .priority-4 { background-color: #33b5e5; }
+    .context-menu {
+      position: fixed;
+      z-index: 1000;
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+      padding: 5px 0;
+    }
+    .context-menu-item {
+      padding: 8px 15px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .context-menu-item:hover {
+      background-color: #f5f5f5;
+    }
+    .context-menu-item i {
+      font-size: 14px;
+      color: #666;
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+</head>
+<body>
+  <div class="container">
+    <h1>日程管理小秘书</h1>
+    <div class="add-form">
+      <input type="text" id="itemName" placeholder="输入任务名称">
+      <button onclick="addItem()">添加任务</button>
+    </div>
+
+    <div class="quadrant-container">
+      <div class="quadrant-row">
+        <div class="quadrant" id="q1" ondrop="drop(event)" ondragover="allowDrop(event)">
+          <div class="quadrant-title">重要且紧急</div>
+          <ul class="workflow-list"></ul>
+          <div class="resizer-h" onmousedown="initResize('h', 0)"></div>
+          <div class="resizer-v" onmousedown="initResize('v', 0)"></div>
+        </div>
+        <div class="quadrant" id="q2" ondrop="drop(event)" ondragover="allowDrop(event)">
+          <div class="quadrant-title">重要不紧急</div>
+          <ul class="workflow-list"></ul>
+          <div class="resizer-v" onmousedown="initResize('v', 1)"></div>
+        </div>
+      </div>
+      <div class="quadrant-row">
+        <div class="quadrant" id="q3" ondrop="drop(event)" ondragover="allowDrop(event)">
+          <div class="quadrant-title">紧急不重要</div>
+          <ul class="workflow-list"></ul>
+          <div class="resizer-h" onmousedown="initResize('h', 2)"></div>
+        </div>
+        <div class="quadrant" id="q4" ondrop="drop(event)" ondragover="allowDrop(event)">
+          <div class="quadrant-title">不重要不紧急</div>
+          <ul class="workflow-list"></ul>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="developer-info">开发者：齐云龙</div>
+
+  <script>
+    const { ipcRenderer } = require('electron');
+
+    // 获取工作流程项目
+    ipcRenderer.send('get-workflow');
+    ipcRenderer.on('workflow-items', (event, items) => {
+      renderItems(items);
+    });
+
+    let workflowItems = [];
+
+    function renderItems(items) {
+      workflowItems = items;
+      // 清空所有象限
+      document.querySelectorAll('.quadrant .workflow-list').forEach(list => {
+        list.innerHTML = '';
+      });
+
+      // 按象限渲染项目
+      items.forEach((item, index) => {
+        const quadrant = document.querySelector(`#${item.group || 'q4'} .workflow-list`);
+        if (quadrant) {
+          const li = document.createElement('li');
+          li.className = 'workflow-item';
+          li.draggable = true;
+          li.setAttribute('data-index', index);
+          li.addEventListener('contextmenu', (e) => showContextMenu(e, index));
+          li.innerHTML = `
+            <span class="priority-indicator priority-${item.group ? item.group.substring(1) : '4'}"></span>
+            <span class="item-name" onclick="launchItem(${index})" style="cursor: pointer;">${item.name}</span>
+            ${item.filePath ? `<a class="item-link" onclick="launchItem(${index})" title="${item.filePath}"><i class="fas fa-file"></i><span>${item.filePath}</span></a>` : ''}
+            ${item.link ? `<a class="item-link" onclick="window.open('${item.link}')" title="${item.link}"><i class="fas fa-link"></i><span>${item.link}</span></a>` : ''}
+            <button class="delete-btn" onclick="deleteItem(${index})">删除</button>
+          `;
+          li.addEventListener('dragstart', handleDragStart);
+          quadrant.appendChild(li);
+        }
+      });
+    }
+
+    let selectedFilePath = '';
+
+    async function selectFile() {
+      const filePath = await ipcRenderer.invoke('select-file');
+      if (filePath) {
+        selectedFilePath = filePath;
+      }
+    }
+
+    let selectedLink = '';
+
+    function attachLink() {
+      const linkInput = document.getElementById('itemLink');
+      selectedLink = linkInput.value.trim();
+      linkInput.value = '';
+    }
+
+    function addItem() {
+      const nameInput = document.getElementById('itemName');
+      const name = nameInput.value.trim();
+
+      if (name) {
+        workflowItems.push({
+          name,
+          group: 'q4',
+          filePath: selectedFilePath,
+          link: selectedLink
+        });
+        ipcRenderer.send('save-workflow', workflowItems);
+        nameInput.value = '';
+        selectedFilePath = '';
+        selectedLink = '';
+        renderItems(workflowItems);
+      }
+    }
+
+    function launchItem(index) {
+      const item = workflowItems[index];
+      if (item.filePath) {
+        ipcRenderer.send('launch-item', `open "${item.filePath}"`);
+      }
+    }
+
+    function deleteItem(index) {
+      workflowItems.splice(index, 1);
+      ipcRenderer.send('save-workflow', workflowItems);
+      renderItems(workflowItems);
+    }
+
+    function handleDragStart(e) {
+      e.dataTransfer.setData('text/plain', JSON.stringify({
+        index: e.target.getAttribute('data-index'),
+        quadrant: e.target.closest('.quadrant').id
+      }));
+    }
+
+    function allowDrop(e) {
+      e.preventDefault();
+    }
+
+    function drop(e) {
+      e.preventDefault();
+      const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+      const draggedIndex = parseInt(data.index);
+      const sourceQuadrant = data.quadrant;
+      const targetQuadrant = e.currentTarget.id;
+      const item = workflowItems[draggedIndex];
+      
+      if (item) {
+        const dropTarget = e.target.closest('.workflow-item');
+        const targetList = e.currentTarget.querySelector('.workflow-list');
+        
+        // 移除原始位置的项目
+        workflowItems.splice(draggedIndex, 1);
+        
+        if (dropTarget) {
+          // 如果拖放到了另一个项目上
+          const targetIndex = parseInt(dropTarget.getAttribute('data-index'));
+          const adjustedIndex = targetIndex > draggedIndex ? targetIndex - 1 : targetIndex;
+          workflowItems.splice(adjustedIndex, 0, item);
+        } else {
+          // 如果拖放到了空白区域
+          workflowItems.push(item);
+        }
+        
+        // 更新象限信息
+        item.group = targetQuadrant;
+        
+        // 保存并重新渲染
+        ipcRenderer.send('save-workflow', workflowItems);
+        renderItems(workflowItems);
+      }
+    }
+
+    let contextMenu = null;
+
+    function showContextMenu(e, index) {
+      e.preventDefault();
+      if (contextMenu) {
+        document.body.removeChild(contextMenu);
+      }
+
+      contextMenu = document.createElement('div');
+      contextMenu.className = 'context-menu';
+      contextMenu.innerHTML = `
+        <div class="context-menu-item" onclick="handleContextMenu('file', ${index})">
+          <i class="fas fa-file"></i> 附加文件
+        </div>
+        <div class="context-menu-item" onclick="handleContextMenu('link', ${index})">
+          <i class="fas fa-link"></i> 附加链接
+        </div>
+      `;
+
+      contextMenu.style.left = `${e.pageX}px`;
+      contextMenu.style.top = `${e.pageY}px`;
+      document.body.appendChild(contextMenu);
+    }
+
+    document.addEventListener('click', () => {
+      if (contextMenu) {
+        document.body.removeChild(contextMenu);
+        contextMenu = null;
+      }
+    });
+
+    let isResizing = false;
+    let currentResizer = null;
+    let initialX = 0;
+    let initialY = 0;
+
+    function initResize(direction, index) {
+      isResizing = true;
+      currentResizer = { direction, index };
+
+      document.addEventListener('mousemove', resize);
+      document.addEventListener('mouseup', stopResize);
+    }
+
+    function resize(e) {
+      if (!isResizing) return;
+
+      const container = document.querySelector('.quadrant-container');
+      const rows = document.querySelectorAll('.quadrant-row');
+      
+      if (currentResizer.direction === 'h') {
+        const row = rows[Math.floor(currentResizer.index / 2)];
+        const rect = row.getBoundingClientRect();
+        const percentage = ((e.clientX - rect.left) / rect.width) * 100;
+        
+        if (percentage > 20 && percentage < 80) {
+          const quadrants = row.querySelectorAll('.quadrant');
+          quadrants[0].style.width = `${percentage}%`;
+          quadrants[1].style.width = `${100 - percentage}%`;
+        }
+      } else if (currentResizer.direction === 'v') {
+        const rect = container.getBoundingClientRect();
+        const percentage = ((e.clientY - rect.top) / rect.height) * 100;
+        
+        if (percentage > 20 && percentage < 80) {
+          rows[0].style.height = `${percentage}%`;
+          rows[1].style.height = `${100 - percentage}%`;
+        }
+      }
+    }
+
+    function stopResize() {
+      isResizing = false;
+      currentResizer = null;
+      document.removeEventListener('mousemove', resize);
+      document.removeEventListener('mouseup', stopResize);
+    }
+
+    async function handleContextMenu(type, index) {
+      if (type === 'file') {
+        const filePath = await ipcRenderer.invoke('select-file');
+        if (filePath) {
+          workflowItems[index].filePath = filePath;
+          ipcRenderer.send('save-workflow', workflowItems);
+          renderItems(workflowItems);
+        }
+      } else if (type === 'link') {
+        const linkPrompt = document.createElement('div');
+        linkPrompt.style.position = 'fixed';
+        linkPrompt.style.top = '50%';
+        linkPrompt.style.left = '50%';
+        linkPrompt.style.transform = 'translate(-50%, -50%)';
+        linkPrompt.style.backgroundColor = 'white';
+        linkPrompt.style.padding = '20px';
+        linkPrompt.style.borderRadius = '8px';
+        linkPrompt.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+        linkPrompt.style.zIndex = '1000';
+        linkPrompt.innerHTML = `
+          <h3 style="margin-top: 0;">请输入链接地址</h3>
+          <input type="text" id="linkInput" style="width: 100%; padding: 8px; margin: 10px 0; border: 1px solid #ddd; border-radius: 4px;">
+          <div style="text-align: right;">
+            <button onclick="document.body.removeChild(this.parentElement.parentElement)" style="margin-right: 10px; padding: 8px 16px; background: #ddd; border: none; border-radius: 4px; cursor: pointer;">取消</button>
+            <button onclick="submitLink(${index})" style="padding: 8px 16px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">确定</button>
+          </div>
+        `;
+        document.body.appendChild(linkPrompt);
+        document.getElementById('linkInput').focus();
+      }
+    }
+
+    function submitLink(index) {
+      const linkInput = document.getElementById('linkInput');
+      const link = linkInput.value.trim();
+      if (link) {
+        try {
+          new URL(link);
+          workflowItems[index].link = link;
+          ipcRenderer.send('save-workflow', workflowItems);
+          renderItems(workflowItems);
+          document.body.removeChild(linkInput.parentElement);
+        } catch (e) {
+          alert('请输入有效的链接地址');
+        }
+      }
+    }
+
+    function renderItems(items) {
+      workflowItems = items;
+      document.querySelectorAll('.quadrant .workflow-list').forEach(list => {
+        list.innerHTML = '';
+      });
+
+      items.forEach((item, index) => {
+        const quadrant = document.querySelector(`#${item.group || 'q4'} .workflow-list`);
+        if (quadrant) {
+          const li = document.createElement('li');
+          li.className = 'workflow-item';
+          li.draggable = true;
+          li.setAttribute('data-index', index);
+          li.addEventListener('contextmenu', (e) => showContextMenu(e, index));
+          li.innerHTML = `
+            <span class="priority-indicator priority-${item.group ? item.group.substring(1) : '4'}"></span>
+            <span class="item-name" onclick="launchItem(${index})" style="cursor: pointer;">${item.name}</span>
+            ${item.filePath ? `<a class="item-link" onclick="launchItem(${index})" title="${item.filePath}"><i class="fas fa-file"></i><span>${item.filePath}</span></a>` : ''}
+            ${item.link ? `<a class="item-link" onclick="window.open('${item.link}')" title="${item.link}"><i class="fas fa-link"></i><span>${item.link}</span></a>` : ''}
+            <button class="delete-btn" onclick="deleteItem(${index})">删除</button>
+          `;
+          li.addEventListener('dragstart', handleDragStart);
+          quadrant.appendChild(li);
+        }
+      });
+    }
+  </script>
+</body>
+</html>
