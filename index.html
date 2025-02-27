@@ -63,6 +63,24 @@
       box-shadow: 0 2px 4px rgba(0,0,0,0.1);
       position: relative;
     }
+    .datetime-display {
+      text-align: center;
+      font-size: 1.2em;
+      color: #666;
+      margin-bottom: 20px;
+      padding: 10px;
+      background: #f8f8f8;
+      border-radius: 4px;
+    }
+    .workflow-item input[type="checkbox"] {
+      margin-right: 10px;
+      width: 18px;
+      height: 18px;
+    }
+    .workflow-item.completed {
+      text-decoration: line-through;
+      color: #999;
+    }
     h1 {
       color: #333;
       text-align: center;
@@ -191,6 +209,14 @@
       border-radius: 6px;
       box-shadow: 0 1px 3px rgba(0,0,0,0.05);
     }
+    .completed {
+      text-decoration: line-through;
+      opacity: 0.6;
+    }
+    .task-checkbox {
+      margin-right: 8px;
+      cursor: pointer;
+    }
     .workflow-item:hover {
       background-color: #f8f8f8;
     }
@@ -300,6 +326,7 @@
   </div>
   <div class="container">
     <h1>日程管理小秘书</h1>
+    <div class="datetime-display" id="datetime"></div>
     <div class="add-form">
       <input type="text" id="itemName" placeholder="输入任务名称">
       <button onclick="addItem()">添加任务</button>
@@ -339,6 +366,26 @@
   <script>
     const { ipcRenderer } = require('electron');
 
+    // 更新时间显示
+    function updateDateTime() {
+      const now = new Date();
+      const options = { 
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        weekday: 'long',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      };
+      document.getElementById('datetime').textContent = now.toLocaleString('zh-CN', options);
+    }
+    
+    // 初始更新时间
+    updateDateTime();
+    // 每秒更新一次时间
+    setInterval(updateDateTime, 1000);
+
     // 获取工作流程项目
     ipcRenderer.send('get-workflow');
     ipcRenderer.on('workflow-items', (event, items) => {
@@ -364,9 +411,10 @@
           li.setAttribute('data-index', index);
           li.addEventListener('contextmenu', (e) => showContextMenu(e, index));
           li.innerHTML = `
+            <input type="checkbox" class="task-checkbox" ${item.completed ? 'checked' : ''} onclick="toggleComplete(event, ${index})">
             <span class="priority-indicator priority-${item.group ? item.group.substring(1) : '4'}"></span>
-            <span class="item-name" onclick="launchItem(${index})" style="cursor: pointer;">${item.name}</span>
-            ${item.filePath ? `<a class="item-link" onclick="launchItem(${index})" title="${item.filePath}"><i class="fas fa-file"></i><span>${item.filePath}</span></a>` : ''}
+            <span class="item-name ${item.completed ? 'completed' : ''}" onclick="launchItem(${index})" ondblclick="startEdit(${index}, this)" style="cursor: pointer;">${item.name}</span>
+            ${item.filePath ? `<a class="item-link" onclick="launchItem(${index})" title="${item.filePath}"><i class="fas ${item.isApp ? 'fa-desktop' : 'fa-file'}"></i><span>${item.filePath}</span></a>` : ''}
             ${item.link ? `<a class="item-link" onclick="window.open('${item.link}')" title="${item.link}"><i class="fas fa-link"></i><span>${item.link}</span></a>` : ''}
             <button class="delete-btn" onclick="deleteItem(${index})">删除</button>
           `;
@@ -387,10 +435,9 @@
 
     let selectedLink = '';
 
-    function attachLink() {
-      const linkInput = document.getElementById('itemLink');
-      selectedLink = linkInput.value.trim();
-      linkInput.value = '';
+    // 移除未使用的attachLink函数，因为我们现在使用handleContextMenu('link', index)来处理链接附加
+    function attachLink(index) {
+      handleContextMenu('link', index);
     }
 
     function addItem() {
@@ -402,7 +449,8 @@
           name,
           group: 'q4',
           filePath: selectedFilePath,
-          link: selectedLink
+          link: selectedLink,
+          completed: false
         });
         ipcRenderer.send('save-workflow', workflowItems);
         nameInput.value = '';
@@ -415,9 +463,16 @@
     function launchItem(index) {
       const item = workflowItems[index];
       if (item.filePath) {
-        ipcRenderer.send('launch-item', `open "${item.filePath}"`);
+        ipcRenderer.send('launch-item', item.filePath);
+      } else if (item.link) {
+        window.open(item.link);
       }
     }
+
+    // 监听启动错误
+    ipcRenderer.on('launch-error', (event, message) => {
+      alert('启动失败: ' + message);
+    });
 
     function deleteItem(index) {
       workflowItems.splice(index, 1);
@@ -472,25 +527,71 @@
 
     let contextMenu = null;
 
-    function showContextMenu(e, index) {
-      e.preventDefault();
+    function showContextMenu(event, index) {
+      event.preventDefault();
+      // 移除已存在的菜单
       if (contextMenu) {
         document.body.removeChild(contextMenu);
+        contextMenu = null;
       }
-
+      // 使用全局变量而不是创建局部变量
       contextMenu = document.createElement('div');
       contextMenu.className = 'context-menu';
-      contextMenu.innerHTML = `
-        <div class="context-menu-item" onclick="handleContextMenu('file', ${index})">
-          <i class="fas fa-file"></i> 附加文件
-        </div>
-        <div class="context-menu-item" onclick="handleContextMenu('link', ${index})">
-          <i class="fas fa-link"></i> 附加链接
-        </div>
-      `;
+      
+      // 创建一个单独的closeMenu函数
+      function closeMenu(e) {
+        if (!contextMenu) return;
+        if (!e || !contextMenu.contains(e.target)) {
+          document.body.removeChild(contextMenu);
+          contextMenu = null;
+          document.removeEventListener('click', closeMenu);
+        }
+      }
+      
+      // 添加点击其他区域关闭菜单的功能
+      setTimeout(() => {
+        document.addEventListener('click', closeMenu);
+      }, 0);
+      
+      const editItem = document.createElement('div');
+      editItem.className = 'context-menu-item';
+      editItem.innerHTML = '<i class="fas fa-edit"></i>修改名称';
+      editItem.onclick = () => {
+        const element = document.querySelector(`[data-index="${index}"] .item-name`);
+        startEdit(index, element);
+        closeMenu();
+      };
+      contextMenu.appendChild(editItem);
 
-      contextMenu.style.left = `${e.pageX}px`;
-      contextMenu.style.top = `${e.pageY}px`;
+      const attachFileItem = document.createElement('div');
+      attachFileItem.className = 'context-menu-item';
+      attachFileItem.innerHTML = '<i class="fas fa-file"></i>附加文件';
+      attachFileItem.onclick = () => {
+        handleContextMenu('file', index);
+        closeMenu();
+      };
+      contextMenu.appendChild(attachFileItem);
+
+      const openAppItem = document.createElement('div');
+      openAppItem.className = 'context-menu-item';
+      openAppItem.innerHTML = '<i class="fas fa-desktop"></i>打开程序';
+      openAppItem.onclick = () => {
+        handleContextMenu('app', index);
+        closeMenu();
+      };
+      contextMenu.appendChild(openAppItem);
+
+      const attachLinkItem = document.createElement('div');
+      attachLinkItem.className = 'context-menu-item';
+      attachLinkItem.innerHTML = '<i class="fas fa-link"></i>附加链接';
+      attachLinkItem.onclick = () => {
+        handleContextMenu('link', index);
+        closeMenu();
+      };
+      contextMenu.appendChild(attachLinkItem);
+
+      contextMenu.style.left = `${event.pageX}px`;
+      contextMenu.style.top = `${event.pageY}px`;
       document.body.appendChild(contextMenu);
     }
 
@@ -549,10 +650,34 @@
     }
 
     async function handleContextMenu(type, index) {
+      if (contextMenu) {
+        document.body.removeChild(contextMenu);
+        contextMenu = null;
+      }
+
+      if (type === 'edit') {
+        const itemElement = document.querySelector(`[data-index="${index}"] .item-name`);
+        if (itemElement) {
+          startEdit(index, itemElement);
+        }
+        return;
+      }
+
       if (type === 'file') {
         const filePath = await ipcRenderer.invoke('select-file');
         if (filePath) {
           workflowItems[index].filePath = filePath;
+          workflowItems[index].link = ''; // 清除之前的链接
+          workflowItems[index].isApp = false; // 标记为普通文件
+          ipcRenderer.send('save-workflow', workflowItems);
+          renderItems(workflowItems);
+        }
+      } else if (type === 'app') {
+        const filePath = await ipcRenderer.invoke('select-file');
+        if (filePath) {
+          workflowItems[index].filePath = filePath;
+          workflowItems[index].link = ''; // 清除之前的链接
+          workflowItems[index].isApp = true; // 标记为应用程序
           ipcRenderer.send('save-workflow', workflowItems);
           renderItems(workflowItems);
         }
@@ -584,16 +709,64 @@
       const linkInput = document.getElementById('linkInput');
       const link = linkInput.value.trim();
       if (link) {
-        try {
-          new URL(link);
+        // 检查是否为本地文件路径
+        if (link.startsWith('/') || link.startsWith('./') || /^[A-Za-z]:\\/.test(link)) {
           workflowItems[index].link = link;
           ipcRenderer.send('save-workflow', workflowItems);
           renderItems(workflowItems);
           document.body.removeChild(linkInput.parentElement);
-        } catch (e) {
-          alert('请输入有效的链接地址');
+        } else {
+          // 检查是否为有效的网页URL
+          try {
+            new URL(link);
+            workflowItems[index].link = link;
+            ipcRenderer.send('save-workflow', workflowItems);
+            renderItems(workflowItems);
+            document.body.removeChild(linkInput.parentElement);
+          } catch (e) {
+            alert('请输入有效的链接地址（支持网页URL或本地文件路径）');
+          }
         }
       }
+    }
+    
+    function toggleComplete(event, index) {
+      // 阻止事件冒泡，避免触发其他点击事件
+      event.stopPropagation();
+      
+      // 切换完成状态
+      workflowItems[index].completed = !workflowItems[index].completed;
+      
+      // 保存到存储并重新渲染
+      ipcRenderer.send('save-workflow', workflowItems);
+      renderItems(workflowItems);
+    }
+
+    function startEdit(index, element) {
+      const item = workflowItems[index];
+      const currentName = item.name;
+      element.innerHTML = `<input type="text" class="edit-name" value="${currentName}" style="width: 200px;">`;
+      element.onclick = null;
+      
+      const input = element.querySelector('.edit-name');
+      input.focus();
+      input.setSelectionRange(currentName.length, currentName.length);
+      
+      function saveEdit() {
+        const newName = input.value.trim();
+        if (newName && newName !== currentName) {
+          workflowItems[index].name = newName;
+          ipcRenderer.send('save-workflow', workflowItems);
+        }
+        renderItems(workflowItems);
+      }
+      
+      input.addEventListener('blur', saveEdit);
+      input.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          saveEdit();
+        }
+      });
     }
 
     function renderItems(items) {
@@ -611,9 +784,10 @@
           li.setAttribute('data-index', index);
           li.addEventListener('contextmenu', (e) => showContextMenu(e, index));
           li.innerHTML = `
+            <input type="checkbox" class="task-checkbox" ${item.completed ? 'checked' : ''} onclick="toggleComplete(event, ${index})">
             <span class="priority-indicator priority-${item.group ? item.group.substring(1) : '4'}"></span>
-            <span class="item-name" onclick="launchItem(${index})" style="cursor: pointer;">${item.name}</span>
-            ${item.filePath ? `<a class="item-link" onclick="launchItem(${index})" title="${item.filePath}"><i class="fas fa-file"></i><span>${item.filePath}</span></a>` : ''}
+            <span class="item-name ${item.completed ? 'completed' : ''}" onclick="launchItem(${index})" ondblclick="startEdit(${index}, this)" style="cursor: pointer;">${item.name}</span>
+            ${item.filePath ? `<a class="item-link" onclick="launchItem(${index})" title="${item.filePath}"><i class="fas ${item.isApp ? 'fa-desktop' : 'fa-file'}"></i><span>${item.filePath}</span></a>` : ''}
             ${item.link ? `<a class="item-link" onclick="window.open('${item.link}')" title="${item.link}"><i class="fas fa-link"></i><span>${item.link}</span></a>` : ''}
             <button class="delete-btn" onclick="deleteItem(${index})">删除</button>
           `;

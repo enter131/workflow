@@ -44,12 +44,29 @@ ipcMain.on('get-workflow', (event) => {
   event.reply('workflow-items', items);
 });
 
-ipcMain.on('launch-item', (event, command) => {
-  require('child_process').exec(command, (error) => {
-    if (error) {
-      console.error('执行命令失败:', error);
+ipcMain.on('launch-item', (event, filePath) => {
+  const { exec } = require('child_process');  
+  const fs = require('fs');
+
+  if (!filePath) return;
+
+  try {
+    if (fs.existsSync(filePath)) {
+      // 使用open命令启动应用程序或打开文件
+      exec(`open "${filePath}"`, (error) => {
+        if (error) {
+          console.error('启动失败:', error);
+          event.reply('launch-error', error.message);
+        }
+      });
+    } else {
+      console.error('文件或目录不存在:', filePath);
+      event.reply('launch-error', '文件或目录不存在');
     }
-  });
+  } catch (error) {
+    console.error('处理文件路径时出错:', error);
+    event.reply('launch-error', error.message);
+  }
 });
 
 ipcMain.handle('select-file', async () => {
