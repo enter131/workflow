@@ -294,31 +294,61 @@
     .priority-2 { background-color: #ffbb33; }
     .priority-3 { background-color: #00C851; }
     .priority-4 { background-color: #33b5e5; }
+    
+    .deadline {
+      margin-left: 10px;
+      padding: 3px 8px;
+      background-color: #f0f0f0;
+      border-radius: 4px;
+      font-size: 0.85em;
+      color: #666;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    
+    .deadline i {
+      color: #ff7700;
+      margin-right: 4px;
+      font-size: 1.1em;
+    }
     .context-menu {
       position: fixed;
       z-index: 1000;
       background: white;
       border: 1px solid #ddd;
       border-radius: 4px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
       padding: 5px 0;
+      min-width: 150px;
     }
+
     .context-menu-item {
       padding: 8px 15px;
       cursor: pointer;
       display: flex;
       align-items: center;
       gap: 8px;
+      color: #333;
+      transition: background-color 0.2s ease;
     }
+
     .context-menu-item:hover {
       background-color: #f5f5f5;
     }
+
     .context-menu-item i {
       font-size: 14px;
       color: #666;
+      width: 16px;
     }
   </style>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/zh.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/plugins/confirmDate/confirmDate.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/plugins/confirmDate/confirmDate.css">
 </head>
 <body>
   <div class="logo-container">
@@ -416,10 +446,99 @@
             <span class="item-name ${item.completed ? 'completed' : ''}" onclick="launchItem(${index})" ondblclick="startEdit(${index}, this)" style="cursor: pointer;">${item.name}</span>
             ${item.filePath ? `<a class="item-link" onclick="launchItem(${index})" title="${item.filePath}"><i class="fas ${item.isApp ? 'fa-desktop' : 'fa-file'}"></i><span>${item.filePath}</span></a>` : ''}
             ${item.link ? `<a class="item-link" onclick="window.open('${item.link}')" title="${item.link}"><i class="fas fa-link"></i><span>${item.link}</span></a>` : ''}
+            ${item.deadline ? `<span class="deadline" title="截止时间"><i class="fas fa-clock"></i> ${formatDeadline(item.deadline)}</span>` : ''}
             <button class="delete-btn" onclick="deleteItem(${index})">删除</button>
           `;
           li.addEventListener('dragstart', handleDragStart);
           quadrant.appendChild(li);
+        }
+      });
+    }
+
+    function formatDeadline(deadline) {
+      const date = new Date(deadline);
+      return date.toLocaleString('zh-CN', {
+        month: 'numeric',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
+
+    function setDeadline(index) {
+      const item = workflowItems[index];
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.value = item.deadline || '';
+      
+      flatpickr(input, {
+        locale: 'zh',
+        enableTime: true,
+        dateFormat: 'Y-m-d H:i',
+        defaultDate: item.deadline,
+        allowInput: true,
+        clickOpens: true,
+        enableSeconds: false,
+        time_24hr: true,
+        minuteIncrement: 1,
+        position: 'center',
+        static: false,
+        showMonths: 1,
+        confirmIcon: "<i class='fa fa-check'></i>",
+        confirmText: "确定",
+        closeOnSelect: false,
+        inline: false,
+        appendTo: document.querySelector('.container'),
+        onChange: function(selectedDates, dateStr) {
+          if (selectedDates.length > 0) {
+            item.deadline = selectedDates[0].toISOString();
+            ipcRenderer.send('update-workflow', workflowItems);
+            renderItems(workflowItems);
+          }
+        },
+        onClose: function(selectedDates, dateStr) {
+          if (selectedDates.length > 0) {
+            item.deadline = selectedDates[0].toISOString();
+            ipcRenderer.send('update-workflow', workflowItems);
+            renderItems(workflowItems);
+          }
+        },
+        plugins: [
+          new confirmDatePlugin({
+            confirmIcon: "<i class='fa fa-check'></i>",
+            confirmText: "确定",
+            showAlways: true,
+            theme: "light"
+          })
+        ]
+      });
+      input.click();
+    }
+
+    function showContextMenu(event, index) {
+      event.preventDefault();
+      const contextMenu = document.createElement('div');
+      contextMenu.className = 'context-menu';
+      contextMenu.innerHTML = `
+        <div class="menu-item" onclick="handleContextMenu('file', ${index})">附加文件</div>
+        <div class="menu-item" onclick="handleContextMenu('link', ${index})">附加链接</div>
+        <div class="menu-item" onclick="setDeadline(${index})">设置截止时间</div>
+      `;
+      
+      // 移除任何现有的上下文菜单
+      document.querySelectorAll('.context-menu').forEach(menu => menu.remove());
+      
+      document.body.appendChild(contextMenu);
+      
+      // 定位菜单
+      contextMenu.style.left = `${event.pageX}px`;
+      contextMenu.style.top = `${event.pageY}px`;
+      
+      // 点击其他地方时关闭菜单
+      document.addEventListener('click', function closeMenu(e) {
+        if (!contextMenu.contains(e.target)) {
+          contextMenu.remove();
+          document.removeEventListener('click', closeMenu);
         }
       });
     }
@@ -534,65 +653,52 @@
         document.body.removeChild(contextMenu);
         contextMenu = null;
       }
-      // 使用全局变量而不是创建局部变量
+
       contextMenu = document.createElement('div');
       contextMenu.className = 'context-menu';
       
-      // 创建一个单独的closeMenu函数
-      function closeMenu(e) {
-        if (!contextMenu) return;
-        if (!e || !contextMenu.contains(e.target)) {
+      const menuItems = [
+        { icon: 'fa-edit', text: '修改名称', handler: () => {
+          const element = document.querySelector(`[data-index="${index}"] .item-name`);
+          startEdit(index, element);
+        }},
+        { icon: 'fa-file', text: '附加文件', handler: () => handleContextMenu('file', index) },
+        { icon: 'fa-desktop', text: '打开程序', handler: () => handleContextMenu('app', index) },
+        { icon: 'fa-link', text: '附加链接', handler: () => handleContextMenu('link', index) },
+        { icon: 'fa-clock', text: '设置截止时间', handler: () => setDeadline(index) }
+      ];
+
+      menuItems.forEach(item => {
+        const menuItem = document.createElement('div');
+        menuItem.className = 'context-menu-item';
+        menuItem.innerHTML = `<i class="fas ${item.icon}"></i>${item.text}`;
+        menuItem.onclick = (e) => {
+          e.stopPropagation();
+          item.handler();
           document.body.removeChild(contextMenu);
           contextMenu = null;
-          document.removeEventListener('click', closeMenu);
-        }
-      }
-      
-      // 添加点击其他区域关闭菜单的功能
-      setTimeout(() => {
-        document.addEventListener('click', closeMenu);
-      }, 0);
-      
-      const editItem = document.createElement('div');
-      editItem.className = 'context-menu-item';
-      editItem.innerHTML = '<i class="fas fa-edit"></i>修改名称';
-      editItem.onclick = () => {
-        const element = document.querySelector(`[data-index="${index}"] .item-name`);
-        startEdit(index, element);
-        closeMenu();
-      };
-      contextMenu.appendChild(editItem);
-
-      const attachFileItem = document.createElement('div');
-      attachFileItem.className = 'context-menu-item';
-      attachFileItem.innerHTML = '<i class="fas fa-file"></i>附加文件';
-      attachFileItem.onclick = () => {
-        handleContextMenu('file', index);
-        closeMenu();
-      };
-      contextMenu.appendChild(attachFileItem);
-
-      const openAppItem = document.createElement('div');
-      openAppItem.className = 'context-menu-item';
-      openAppItem.innerHTML = '<i class="fas fa-desktop"></i>打开程序';
-      openAppItem.onclick = () => {
-        handleContextMenu('app', index);
-        closeMenu();
-      };
-      contextMenu.appendChild(openAppItem);
-
-      const attachLinkItem = document.createElement('div');
-      attachLinkItem.className = 'context-menu-item';
-      attachLinkItem.innerHTML = '<i class="fas fa-link"></i>附加链接';
-      attachLinkItem.onclick = () => {
-        handleContextMenu('link', index);
-        closeMenu();
-      };
-      contextMenu.appendChild(attachLinkItem);
+        };
+        contextMenu.appendChild(menuItem);
+      });
 
       contextMenu.style.left = `${event.pageX}px`;
       contextMenu.style.top = `${event.pageY}px`;
       document.body.appendChild(contextMenu);
+
+      // 点击其他区域关闭菜单
+      const closeMenu = (e) => {
+        if (!contextMenu) return;
+        if (!contextMenu.contains(e.target)) {
+          document.body.removeChild(contextMenu);
+          contextMenu = null;
+          document.removeEventListener('click', closeMenu);
+        }
+      };
+
+      // 延迟添加点击事件，避免立即触发
+      setTimeout(() => {
+        document.addEventListener('click', closeMenu);
+      }, 0);
     }
 
     document.addEventListener('click', () => {
@@ -789,6 +895,7 @@
             <span class="item-name ${item.completed ? 'completed' : ''}" onclick="launchItem(${index})" ondblclick="startEdit(${index}, this)" style="cursor: pointer;">${item.name}</span>
             ${item.filePath ? `<a class="item-link" onclick="launchItem(${index})" title="${item.filePath}"><i class="fas ${item.isApp ? 'fa-desktop' : 'fa-file'}"></i><span>${item.filePath}</span></a>` : ''}
             ${item.link ? `<a class="item-link" onclick="window.open('${item.link}')" title="${item.link}"><i class="fas fa-link"></i><span>${item.link}</span></a>` : ''}
+            ${item.deadline ? `<span class="deadline" title="截止时间"><i class="fas fa-clock"></i> ${formatDeadline(item.deadline)}</span>` : ''}
             <button class="delete-btn" onclick="deleteItem(${index})">删除</button>
           `;
           li.addEventListener('dragstart', handleDragStart);
